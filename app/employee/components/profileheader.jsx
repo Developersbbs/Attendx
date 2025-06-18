@@ -618,43 +618,21 @@ export function DailyAttendance({
         throw new Error("User not authenticated or phone number not available");
       }
 
-      // const phoneNumber = user.phoneNumber.slice(3);
-      // const dateToday = format(new Date(), "yyyy-MM-dd");
-      // const now = new Date();
-      // const nowTime = format(now, "hh:mm a");
-
-      // const defaultStartTime = parse(
-      //   attendanceSettings.defaultStartTime,
-      //   "HH:mm",
-      //   new Date()
-      // );
-      // const diffInMinutes = differenceInMinutes(now, defaultStartTime);
-
-      // let statusToSave = "present";
-      // if (isAbsent(nowTime)) {
-      //   statusToSave = "absent";
-      // } else if (diffInMinutes > (attendanceSettings.lateCheckInAllowed || 0)) {
-      //   statusToSave = "late";
-      // } else if (diffInMinutes < -(attendanceSettings.earlyCheckInAllowed || 0)) {
-      //   statusToSave = "early";
-      // }
-
-      // const isLate = statusToSave === "late";
-      // const isEarly = statusToSave === "early";
-
       try {
-        const distance = calculateDistance(
-          locationSettings.latitude,
-          locationSettings.longitude,
-          geoLocation.latitude,
-          geoLocation.longitude
-        );
-        console.log("distance office", locationSettings.radius);
-        if (distance > locationSettings.radius) {
-          sonnerToast.error("Check-in Failed", {
-            description: "You are not in the office location.",
-          });
-          return;
+        if (locationSettings?.latitude && locationSettings?.longitude && geoLocation?.latitude && geoLocation?.longitude) {
+          const distance = calculateDistance(
+            locationSettings.latitude,
+            locationSettings.longitude,
+            geoLocation.latitude,
+            geoLocation.longitude
+          );
+          console.log("distance office", locationSettings.radius);
+          if (distance > locationSettings.radius) {
+            sonnerToast.error("Check-in Failed", {
+              description: "You are not in the office location.",
+            });
+            return;
+          }
         }
       } catch (error) {
         sonnerToast.error("Check-in Failed", {
@@ -709,7 +687,7 @@ export function DailyAttendance({
         city: geoLocation?.city || "Unknown City",
         state: geoLocation?.state || "Unknown State",
         country: geoLocation?.country || "Unknown Country",
-        fullAddress: geoLocation?.fullAddress || currentLocation,
+        fullAddress: geoLocation?.fullAddress || geoLocation?.formattedAddress || geoLocation?.address || currentLocation || "Office Geo",
         addressInfo: geoLocation?.addressInfo || null,
         timestamp: Timestamp.now(),
       };
@@ -832,6 +810,56 @@ export function DailyAttendance({
         setCtx(context);
       }
     }, [canvasRef]);
+
+    // Add touch event listeners for mobile support
+    useEffect(() => {
+      if (!canvasRef) return;
+
+      const canvas = canvasRef;
+
+      const handleTouchStart = (e) => {
+        e.preventDefault();
+        if (disabled || !ctx) return;
+        setIsDrawing(true);
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      };
+
+      const handleTouchMove = (e) => {
+        e.preventDefault();
+        if (!isDrawing || disabled || !ctx) return;
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      };
+
+      const handleTouchEnd = (e) => {
+        e.preventDefault();
+        if (!isDrawing || disabled || !ctx) return;
+        setIsDrawing(false);
+        const dataURL = canvas.toDataURL();
+        onSignatureChange(dataURL);
+      };
+
+      // Add touch event listeners with passive: false to allow preventDefault
+      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+      canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+      // Cleanup function
+      return () => {
+        canvas.removeEventListener('touchstart', handleTouchStart);
+        canvas.removeEventListener('touchmove', handleTouchMove);
+        canvas.removeEventListener('touchend', handleTouchEnd);
+      };
+    }, [canvasRef, ctx, isDrawing, disabled, onSignatureChange]);
 
     // Effect to draw the signature from data URL when the component re-renders
     useEffect(() => {
@@ -1303,7 +1331,11 @@ export function DailyAttendance({
               onClick={
                 attendanceType === "check-in" ? handleCheckIn : handleCheckOut
               }
-              disabled={isLoading || !signature || !geoLocation}
+              disabled={
+                isLoading ||
+                !signature ||
+                (!isWfhApproved && !geoLocation)
+              }
               className="bg-blue-500 hover:bg-blue-600"
             >
               {isLoading ? (
