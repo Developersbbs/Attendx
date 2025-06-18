@@ -1,0 +1,35 @@
+name: Deploy Next.js App to Vercel
+
+on:
+  push:
+    branches:
+      - main # or change to your default branch
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18 # Match your local Node.js version
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: 🛠️ Build Project
+        run: npm run build
+
+      - name: 🚀 Deploy to Vercel
+        run: |
+          npm install -g vercel
+          vercel --prod --token=$VERCEL_TOKEN --confirm --scope=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_NAME
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_NAME: ${{ secrets.VERCEL_PROJECT_NAME }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
