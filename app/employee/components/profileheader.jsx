@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -792,34 +792,73 @@ export function DailyAttendance({
     }
   };
 
-  const SignatureCanvas = ({
-    onSignatureChange,
-    signature,
-    disabled = false,
-  }) => {
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [canvasRef, setCanvasRef] = useState(null);
-    const [ctx, setCtx] = useState(null);
 
+  const SignatureCanvas = ({ onSignatureChange, signature, disabled = false }) => {
+    const canvasRef = useRef(null);
+    const [ctx, setCtx] = useState(null);
+    const [isDrawing, setIsDrawing] = useState(false);
+  
+    // Setup canvas context
     useEffect(() => {
-      if (canvasRef) {
-        const context = canvasRef.getContext("2d");
-        context.strokeStyle = "#000";
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const context = canvas.getContext('2d');
+        context.strokeStyle = '#000';
         context.lineWidth = 2;
-        context.lineCap = "round";
+        context.lineCap = 'round';
         setCtx(context);
       }
-    }, [canvasRef]);
-
-    // Add touch event listeners for mobile support
+    }, []);
+  
+    // Restore existing signature (from data URL)
     useEffect(() => {
-      if (!canvasRef) return;
-
-      const canvas = canvasRef;
-
+      if (ctx && signature) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          ctx.drawImage(img, 0, 0);
+        };
+        img.src = signature;
+      } else if (ctx) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    }, [ctx, signature]);
+  
+    // Mouse Events
+    const startDrawing = (e) => {
+      if (disabled || !ctx) return;
+      setIsDrawing(true);
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+  
+    const draw = (e) => {
+      if (!isDrawing || disabled || !ctx) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    };
+  
+    const stopDrawing = () => {
+      if (!isDrawing || disabled || !ctx) return;
+      setIsDrawing(false);
+      const dataURL = canvasRef.current.toDataURL();
+      onSignatureChange(dataURL);
+    };
+  
+    // Touch Events for Mobile
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || !ctx) return;
+  
       const handleTouchStart = (e) => {
         e.preventDefault();
-        if (disabled || !ctx) return;
+        if (disabled) return;
         setIsDrawing(true);
         const touch = e.touches[0];
         const rect = canvas.getBoundingClientRect();
@@ -828,10 +867,10 @@ export function DailyAttendance({
         ctx.beginPath();
         ctx.moveTo(x, y);
       };
-
+  
       const handleTouchMove = (e) => {
         e.preventDefault();
-        if (!isDrawing || disabled || !ctx) return;
+        if (!isDrawing || disabled) return;
         const touch = e.touches[0];
         const rect = canvas.getBoundingClientRect();
         const x = touch.clientX - rect.left;
@@ -839,75 +878,32 @@ export function DailyAttendance({
         ctx.lineTo(x, y);
         ctx.stroke();
       };
-
+  
       const handleTouchEnd = (e) => {
         e.preventDefault();
-        if (!isDrawing || disabled || !ctx) return;
+        if (!isDrawing || disabled) return;
         setIsDrawing(false);
         const dataURL = canvas.toDataURL();
         onSignatureChange(dataURL);
       };
-
-      // Add touch event listeners with passive: false to allow preventDefault
+  
       canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
       canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
       canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-      // Cleanup function
+  
       return () => {
         canvas.removeEventListener('touchstart', handleTouchStart);
         canvas.removeEventListener('touchmove', handleTouchMove);
         canvas.removeEventListener('touchend', handleTouchEnd);
       };
-    }, [canvasRef, ctx, isDrawing, disabled, onSignatureChange]);
-
-    // Effect to draw the signature from data URL when the component re-renders
-    useEffect(() => {
-      if (ctx && signature) {
-        const img = new Image();
-        img.onload = () => {
-          ctx.clearRect(0, 0, canvasRef.width, canvasRef.height);
-          ctx.drawImage(img, 0, 0);
-        };
-        img.src = signature;
-      } else if (ctx) {
-        // If signature is cleared, ensure canvas is blank
-        ctx.clearRect(0, 0, canvasRef.width, canvasRef.height);
-      }
-    }, [signature, ctx]); // Re-run when signature or canvas context changes
-
-    const startDrawing = (e) => {
-      if (disabled) return;
-      setIsDrawing(true);
-      const rect = canvasRef.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-    };
-
-    const draw = (e) => {
-      if (!isDrawing || disabled) return;
-      const rect = canvasRef.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      ctx.lineTo(x, y);
-      ctx.stroke();
-    };
-
-    const stopDrawing = () => {
-      if (!isDrawing || disabled) return;
-      setIsDrawing(false);
-      const dataURL = canvasRef.toDataURL();
-      onSignatureChange(dataURL);
-    };
-
+    }, [ctx, isDrawing, disabled, onSignatureChange]);
+  
     const clearSignature = () => {
-      if (disabled) return;
-      ctx.clearRect(0, 0, canvasRef.width, canvasRef.height);
-      onSignatureChange("");
+      if (disabled || !ctx) return;
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      onSignatureChange('');
     };
-
+  
     return (
       <div className="space-y-2">
         <Label className="text-sm font-medium flex items-center gap-2">
@@ -916,7 +912,7 @@ export function DailyAttendance({
         </Label>
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-2">
           <canvas
-            ref={setCanvasRef}
+            ref={canvasRef}
             width={280}
             height={120}
             className="w-full h-[120px] bg-white rounded cursor-crosshair"
@@ -924,7 +920,7 @@ export function DailyAttendance({
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
-            style={{ touchAction: "none" }}
+            style={{ touchAction: 'none' }}
           />
         </div>
         <div className="flex justify-between items-center">
@@ -938,7 +934,7 @@ export function DailyAttendance({
             Clear Signature
           </Button>
           <span className="text-xs text-muted-foreground">
-            {signature ? "✓ Signature captured" : "Please sign above"}
+            {signature ? '✓ Signature captured' : 'Please sign above'}
           </span>
         </div>
       </div>
