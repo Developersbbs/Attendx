@@ -667,6 +667,7 @@ export function DailyAttendance({
 
       // Create new attendance document in 'attendance' collection
       const attendanceRecord = {
+        name: userData.name || "Unknown User",
         employeeId: userData.uid,
         adminUid: userData.adminuid,
         date: dateToday,
