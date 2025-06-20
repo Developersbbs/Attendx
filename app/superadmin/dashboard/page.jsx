@@ -19,6 +19,9 @@ const PlaceholderChart = ({ title }) => (
   </div>
 );
 
+
+const user = auth.currentUser;
+
 // Placeholder for stats components
 const DashboardStats = () => {
   // Mock data - fetch this from your backend/Firebase

@@ -83,6 +83,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { DatePicker } from "@/components/ui/datepicker";
 import WfhHistory from "./components/wfhhistory";
+import LeaveTabForMeet from "./components/leavetabformeet";
 
 export default function MemberPage() {
   // Dummy profile data for testing
@@ -122,6 +123,8 @@ export default function MemberPage() {
   const [wfhDate, setWfhDate] = useState(
     new Date().toISOString().split("T")[0]
   );
+
+  const [adminTrackingMethod, setAdminTrackingMethod] = useState("");
   const [wfhReason, setWfhReason] = useState("");
   const [isPermanent, setIsPermanent] = useState(false);
   const [hours, setHours] = useState(false);
@@ -208,6 +211,7 @@ export default function MemberPage() {
       const querySnapshot = await getDocs(q);
       if (!querySnapshot.empty) {
         const adminData = querySnapshot.docs[0].data();
+        
         if(adminData.tracingMethod === "Schedule Meetings"){
           setIsWFhEnabled(true);
         }else{
@@ -1105,7 +1109,7 @@ export default function MemberPage() {
 
       {/* Tabs for History */}
       <Tabs defaultValue="attendanceHistory" className="w-full">
-        <TabsList className={`grid w-full grid-cols-3 h-20 md:h-10 border  sm:grid-cols-3  gap-2 ${!isWFhEnabled ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+        <TabsList className={`grid w-full  h-20 md:h-10 border  sm:grid-cols-3  gap-2 ${!isWFhEnabled ? "md:grid-cols-3 grid-cols-3" : "md:grid-cols-2 grid-cols-2"}`}>
           <TabsTrigger value="attendanceHistory" className="flex items-center justify-center flex-col sm:flex-row">
             <CalendarDays className="mr-2 h-4 w-4" />
             <span className="hidden sm:inline">Attendance History</span>
@@ -1128,7 +1132,9 @@ export default function MemberPage() {
           <Attendancehistory employeeId={profile.uid} user={user} />
         </TabsContent>
         <TabsContent value="leaveHistory" className="mt-4">
-          <Leavetab employeeId={profile.uid} user={user} />
+        
+          {isWFhEnabled? <LeaveTabForMeet user={user} /> : (<Leavetab employeeId={profile.uid} user={user} />)}
+          
         </TabsContent>
         {!isWFhEnabled && (
           <TabsContent value="wfhHistory" className="mt-4">

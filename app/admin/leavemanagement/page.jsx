@@ -42,6 +42,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import LeaveForMeet from "./leaveformeet";
+import LeaveTabForMeet from "@/app/employee/components/leavetabformeet";
 
 
 
@@ -99,11 +101,14 @@ export default function LeaveManagementPage() {
   const [carryForward, setCarryForward] = useState(false);
   const [maximumDaysCarryForward, setMaximumDaysCarryForward] = useState("");
 
+  const [isScheduleMetod , setIsScheduleMetod] = useState(false);
+
     
   const [statusFilter, setStatusFilter] = useState("all"); // 'all', 'pending', 'approved', 'rejected'
   // Using Sonner toast directly
 
   const [isMobile, setIsMobile] = useState(false);
+ 
 
   useEffect(() => {
     const checkMobile = () => {
@@ -126,26 +131,47 @@ export default function LeaveManagementPage() {
         const phone = user.phoneNumber.slice(3);
         const q = query(collection(db, "users") ,where("phone","==",phone));
         const querySnapshot = await getDocs(q);
-        const userData = querySnapshot.docs[0];
-        const adminuid = userData.id;
-       
+        
+        if (querySnapshot.empty) {
+            console.log("Admin user not found");
+            return;
+        }
+
+        const adminDoc = querySnapshot.docs[0];
+        const userData = adminDoc.data();
+        const adminuid = adminDoc.id;
+
+        if(userData.tracingMethod === "Schedule Meetings"){ 
+          setIsScheduleMetod(true);
+        } else {
+          setIsScheduleMetod(false);
+        }
 
         const q2 = query(collection(db, "leaves") ,where("adminuid","==",adminuid));
         const querySnapshot2 = await getDocs(q2);
 
-        
         if(!querySnapshot2.empty){
-          const leaveRequests = querySnapshot2.docs.map((doc) => ({
+          let leaveRequests = querySnapshot2.docs.map((doc) => ({
             id: doc.id,
             ...doc.data(),
           }));
-
-         
         
-         console.log("leaveRequests",leaveRequests)
+         if(userData.tracingMethod === "Schedule Meetings"){
+          leaveRequests = leaveRequests.map((leave) => ({
+            ...leave,
+            meetingDate: leave.meetingDate,
+            meetingTime: leave.meetingTime,
+            meetingTitle: leave.meetingTitle,
+         }));
+        }
+        
           setLeaveRequests(leaveRequests);
           setFilteredLeaveRequests(leaveRequests);
           console.log("Fetched leave requests:", leaveRequests);
+        } else {
+            setLeaveRequests([]);
+            setFilteredLeaveRequests([]);
+            console.log("No leave requests found for this admin.");
         }
       } catch (error) {
         console.error("Error fetching leave requests:", error);
@@ -162,6 +188,9 @@ export default function LeaveManagementPage() {
   
   return () => unsubscribe();
   }, [auth]);
+
+console.log("isScheduleMetod",isScheduleMetod)
+  
 
   useEffect(() => {
     let requests = leaveRequests;
@@ -257,6 +286,9 @@ const handleCarryForwardChange = () => {
     }
   };
 
+
+
+
   const renderMobileCards = () => {
     return (
       <div className="space-y-4">
@@ -275,10 +307,18 @@ const handleCarryForwardChange = () => {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {format(new Date(req.startDate), "MMM dd, yyyy")} -{" "}
-                      {format(new Date(req.endDate), "MMM dd, yyyy")}
-                    </span>
+
+                    {isScheduleMetod ? (
+                      <span>
+                        {format(new Date(req.meetingDate), "yyyy-MM-dd")}
+                      </span>
+                    ) : (
+                      <span>
+                        {format(new Date(req.startDate), "MMM dd, yyyy")} -{" "}
+                        {format(new Date(req.endDate), "MMM dd, yyyy")}
+                      </span>
+                    )}
+                    
                   </div>
                   {req.partialLeave && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -327,6 +367,10 @@ const handleCarryForwardChange = () => {
       </div>
     );
   };
+
+  if(isScheduleMetod){
+    return <LeaveForMeet user={user} />;
+  }
 
   return (
     <div className="space-y-6 mt-10 mx-10">
@@ -394,6 +438,7 @@ const handleCarryForwardChange = () => {
                           
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs sm:text-sm">
+                        
                           {format(new Date(req.startDate), "MMM dd, yyyy")} -{" "}
                           {format(new Date(req.endDate), "MMM dd, yyyy")}
                           {req.partialLeave && (
@@ -460,71 +505,8 @@ const handleCarryForwardChange = () => {
         </CardContent>
       </Card>
 
+     
 
-      {/* <Card className="w-full  shadow-lg border border-gray-200 rounded-xl overflow-hidden">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
-        <CardTitle className="text-xl font-semibold text-gray-800">
-          Leave Configuration
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-6 bg-white">
-        <div className="grid grid-cols-1 gap-6">
-          <div className="space-y-3">
-            <Label 
-              htmlFor="leaveQuota" 
-              className="text-sm font-medium text-gray-700"
-            >
-              Leave Quota (Annual Leave)
-            </Label>
-            <Input
-              id="leaveQuota"
-              name="leaveQuota"
-              value={leaveQuota}
-              onChange={handleLeaveQuotaChange}
-              type="text"
-              placeholder="Enter leave quota (e.g., 12)"
-              className="w-full rounded-md border-gray-300 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
-            />
-            <p className="text-xs text-gray-500">
-              Specify the total number of leave days available.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label 
-                  htmlFor="carryForward" 
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Carry Forward
-                </Label>
-                <p className="text-xs text-gray-500 mt-1">
-                  Allow unused leave days to carry forward to the next month.
-                </p>
-              </div>
-              <Switch
-                id="carryForward"
-                name="carryForward"
-                checked={carryForward}
-                onCheckedChange={handleCarryForwardChange}
-                className={cn(
-                  "relative inline-flex h-6 w-11 items-center rounded-full",
-                  carryForward ? "bg-indigo-600" : "bg-gray-200"
-                )}
-              >
-                <span
-                  className={cn(
-                    "inline-block h-4 w-4 transform rounded-full bg-white transition",
-                    carryForward ? "translate-x-6" : "translate-x-1"
-                  )}
-                />
-              </Switch>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card> */}
     </div>
   );
 }

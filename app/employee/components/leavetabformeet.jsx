@@ -1,16 +1,15 @@
 import { useEffect, useState } from "react";
 import { db } from "@/app/firebase/config";
-import { collection, query, where, getDocs, setDoc, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, setDoc, doc, onSnapshot } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2 as PageLoader } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2 as PageLoader, Hourglass, CheckCircle, XCircle } from "lucide-react";
 import { toast as sonnerToast } from "sonner";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import { Hourglass, CheckCircle } from "lucide-react";
 
 export default function LeaveTabForMeet({ user }) {
   const [meetings, setMeetings] = useState([]);
@@ -19,76 +18,146 @@ export default function LeaveTabForMeet({ user }) {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [leaveRequests, setLeaveRequests] = useState([]);
+  const [anotherUser,setAnotherUser] = useState(null);
+  const [isAttendance,setIsAttendance] = useState(false);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+
   useEffect(() => {
+    if (!user) return;
+
     const fetchMeetings = async () => {
-      if (!user) return;
       try {
-        const phone = user.phoneNumber.slice(3);
-        const userQuery = query(collection(db, "users"), where("phone", "==", phone));
-        const userSnapshot = await getDocs(userQuery);
-        if (userSnapshot.empty) return;
-        const userData = userSnapshot.docs[0].data();
-        const adminUid = userData.adminuid;
-        const employeeUid = userData.uid;
-        const today = format(new Date(), "yyyy-MM-dd");
+        const phone  = user.phoneNumber.slice(3)
+       
+        const q = query(collection(db, "users"), where("phone", "==", phone));
+        const querySnapshot = await getDocs(q);
+        const userData = querySnapshot.docs[0].data();
+        setAnotherUser(userData);
+        const adminuid = userData.adminuid;
+        console.log("adminuid",adminuid)
+       
+        const today = format(new Date(), "yyyy-MM-dd").toString();
         const meetingsQuery = query(
           collection(db, "Meetings"),
-          where("adminUid", "==", adminUid),
+          where("adminUid", "==", adminuid),
           where("meetingDate", "==", today)
         );
+
+        
         const meetingsSnapshot = await getDocs(meetingsQuery);
+        console.log("meetingsSnapshot",meetingsSnapshot.docs[0].data())
         const meetingsList = meetingsSnapshot.docs
           .map(doc => {
             const data = doc.data();
-            const isAttendee = (data.attendees || []).some(a => a.id === employeeUid);
-            if (isAttendee) {
-              return {
-                id: doc.id,
-                ...data,
-              };
-            }
-            return null;
+           
+            return {
+              id: doc.id,
+              ...data,
+            };  
+           
           })
           .filter(Boolean);
+
+        
         setMeetings(meetingsList);
-
-
-        const leaveRequestsQuery = query(
-          collection(db, "leaves"),
-          where("employeeuid", "==", user.uid)
-        );
-        const leaveRequestsSnapshot = await getDocs(leaveRequestsQuery);
-        const leaveRequestsList = leaveRequestsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setLeaveRequests(leaveRequestsList);
+        fetchLeaveRequests(userData.uid);
+        fetchAttendance(userData.uid);
+       
       } catch (err) {
+        console.error("Error fetching meetings: ", err);
         setMeetings([]);
       }
     };
+
     fetchMeetings();
+
+
+    const fetchLeaveRequests = async (employeeuid) => {
+      const q = query(collection(db, "leaves"), where("employeeuid", "==", employeeuid));
+      console.log("q",q)
+      const snapshot = await getDocs(q);
+      const leaveRequests = snapshot.docs.map((doc) => doc.data());
+      console.log("leaveRequests fetchLeaveRequests",leaveRequests)
+      setLeaveRequests(leaveRequests);
+    }
+
+
+    const fetchAttendance = async (employeeuid) => {
+      const q = query(collection(db, "attendance"), where("employeeId", "==", employeeuid));
+      const snapshot = await getDocs(q);
+      const attendance = snapshot.docs.map((doc) => doc.data());
+      if(attendance.length > 0){
+        setIsAttendance(true);
+        setAttendanceRecords(attendance);
+      }
+    }
+    
+    
+
+   
   }, [user]);
 
 
-  console.log(leaveRequests);
+
+  console.log("meetings",meetings)
+  const getLeaveRequestForMeeting = (meetingId) => {
+    return leaveRequests.find(request => request.meetingId === meetingId);
+  };
+
+  const getStatusBadge = (status) => {
+    switch (status?.toLowerCase()) {
+      case "pending":
+        return (
+          <Badge
+            variant="outline"
+            className="border-yellow-500 text-yellow-700 bg-yellow-100 text-xs whitespace-nowrap"
+          >
+            <Hourglass className="mr-1 h-3 w-3" />
+            Pending
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge
+            variant="default"
+            className="bg-green-500 hover:bg-green-600 text-xs whitespace-nowrap text-white"
+          >
+            <CheckCircle className="mr-1 h-3 w-3" />
+            Approved
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge variant="destructive" className="text-xs whitespace-nowrap">
+            <XCircle className="mr-1 h-3 w-3" />
+            Rejected
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
 
   const handleLeaveSubmit = async (e) => {
     e.preventDefault();
     if (!reason || !selectedMeeting) return;
     setLoading(true);
     try {
-      await setDoc(doc(collection(db, "leaves")), {
+      const newLeaveRequest = {
         meetingId: selectedMeeting.id,
         meetingTitle: selectedMeeting.meetingTitle,
         meetingDate: selectedMeeting.meetingDate,
         meetingTime: selectedMeeting.meetingTime,
-        employeeuid: user.uid,
+        meetingDuration: selectedMeeting.meetingDuration,
+        employeeuid: anotherUser.uid,
         adminuid: selectedMeeting.adminUid,
         reason,
         status: "Pending",
         createdAt: new Date(),
-      });
+      };
+      
+      await setDoc(doc(collection(db, "leaves")), newLeaveRequest);
+      
       sonnerToast.success("Leave request submitted", {
         description: `Leave request for '${selectedMeeting.meetingTitle}' submitted successfully!`,
       });
@@ -118,40 +187,43 @@ export default function LeaveTabForMeet({ user }) {
             <p className="text-muted-foreground">No meetings scheduled for you today.</p>
           ) : (
             <div className="space-y-4">
-              {meetings.map((meeting) => (
-                <Card key={meeting.id} className="p-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold">{meeting.meetingTitle}</p>
-                      <p className="text-xs text-muted-foreground">Date: {format(new Date(meeting.meetingDate), "MMM dd, yyyy")} - Time: {meeting.meetingTime}</p>
+              {meetings.map((meeting) => {
+                const leaveRequest = leaveRequests.find(leave => leave.meetingId === meeting.meetingId);
+                 console.log("leaveRequest",leaveRequests)
+              
+                const attended = attendanceRecords.some(a => a.meetingId === meeting.meetingId);
+                return (
+                  <Card key={meeting.meetingId} className="p-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">{meeting.meetingTitle}</p>
+                        <p className="text-xs text-muted-foreground">Date: {format(new Date(meeting.meetingDate), "MMM dd, yyyy")} - Time: {meeting.meetingTime}</p>
+                      </div>
+                      
+                      {leaveRequest ? (
+                        getStatusBadge(leaveRequest.status)
+                      ) : attended ? (
+                        <Badge variant="outline" className="bg-blue-500 text-white text-xs whitespace-nowrap">
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                          Attended
+                        </Badge>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="bg-blue-500 text-white hover:bg-blue-600"
+                          onClick={() => {
+                            setSelectedMeeting(meeting);
+                            setIsDialogOpen(true);
+                          }}
+                        >
+                            Apply for Leave
+                          </Button>
+                      )}
                     </div>
-
-                    {leaveRequests.find(leave => leave.meetingId === meeting.id && leave.status === "Approved") ? (
-                      <Badge variant="outline" className="text-xs whitespace-nowrap bg-green-500 text-white">
-                        <CheckCircle className="mr-1 h-3 w-3" />
-                        Approved
-                      </Badge>
-                    ) : leaveRequests.find(leave => leave.meetingId === meeting.id && leave.status === "Pending") ? (
-                      <Badge variant="outline" className="text-xs whitespace-nowrap">
-                        <Hourglass className="mr-1 h-3 w-3" />
-                        Pending
-                      </Badge>
-                    ) : (
-                      <Button
-                      size="sm"
-                      variant="secondary"
-                      className="bg-blue-500 text-white hover:bg-blue-600"
-                      onClick={() => {
-                        setSelectedMeeting(meeting);
-                        setIsDialogOpen(true);
-                      }}
-                    >
-                      Apply for Leave
-                    </Button>
-                    )}
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
           )}
         </CardContent>

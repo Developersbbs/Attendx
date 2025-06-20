@@ -590,7 +590,10 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
   const [leaveReason, setLeaveReason] = useState("");
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveMeeting, setLeaveMeeting] = useState(null);
+  const [leaveRequests, setLeaveRequests] = useState([]);
 
+  const [isLeave,setIsLeave] = useState(false);
+  
   useEffect(()=>{
     const fetchMeetings = async () => {
       try {
@@ -657,6 +660,7 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
         // Call fetchCheckAndStatus (assuming it handles additional attendance logic)
         fetchCheckAndStatus(employeeId);
         fetchLocationSettings(admin_uid);
+        fetchLeaveRequests(employeeId);
       } catch (error) {
         console.error('Error fetching meetings:', error);
         setTodaysMeetings([]); // Clear meetings on error
@@ -706,8 +710,22 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
         radius: officeLocation.radius || 50,
       });
     }
+
+
+    const fetchLeaveRequests = async (employeeId) => {
+      console.log("before fetchLeaveRequests employeeId",employeeId)
+      const q = query(collection(db, "leaves"), where("employeeuid", "==", employeeId),where("meetingDate", "==", format(new Date(), "yyyy-MM-dd")));
+      const snapshot = await getDocs(q);
+      const leaveRequests = snapshot.docs.map((doc) => doc.data());
+      setLeaveRequests(leaveRequests);
+
+      
+    }
     
-  },[])
+  },[isCheckedIn])
+
+
+  console.log("leaveRequests",leaveRequests)
 
   const isLateCheckIn = (time) => {
        const meeting = todaysMeetings.find(m => m.id === selectedMeeting.id);
@@ -992,19 +1010,31 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
           <p className="font-semibold">{meeting.meetingTitle}</p>
           <p className="text-xs text-muted-foreground">Date: {format(new Date(meeting.meetingDate), "MMM dd, yyyy")} - Time: {meeting.meetingTime}</p>
         </div>
-        <div className="flex flex-col gap-2 items-end">
-        {attendance?.checkInTime ? (
-          <Button size="sm" variant="outline" className="hover:pointer-events-none">
-            <Check className="mr-2 h-4 w-4" /> 
-            {`Marked ${attendance.checkInTime}`}
-          </Button>
+
+        {leaveRequests.find(leave => leave.meetingId === meeting.id && leave.status ==="Approved") ? (
+          <div>
+            <Button size="sm" variant="outline">
+              {`Leave`}
+            </Button>
+          </div>
         ) : (
-          <Button onClick={() => openMarkAttendanceDialog(meeting)} size="sm" variant="outline">
-            <Check className="mr-2 h-4 w-4" /> 
-            {`Mark Attendance`}
-          </Button>
-        )}
-        </div>
+          <div className="flex flex-col gap-2 items-end">
+          {attendance?.checkInTime ? (
+            <Button size="sm" variant="outline" className="hover:pointer-events-none">
+              <Check className="mr-2 h-4 w-4" /> 
+              {`Marked ${attendance.checkInTime}`}
+            </Button>
+          ) : (
+            <Button onClick={() => openMarkAttendanceDialog(meeting)} size="sm" variant="outline">
+              <Check className="mr-2 h-4 w-4" /> 
+              {`Mark Attendance`}
+            </Button>
+          )}
+          </div>
+        )
+      
+      }
+        
       </div>
     </Card>
   );
@@ -1012,7 +1042,7 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
       </div>
       
       {/* Leave Dialog */}
-      <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
+      {/* <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Apply for Leave</DialogTitle>
@@ -1049,7 +1079,7 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
             </DialogFooter>
           </form>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
       
       {/* Mark Attendance Dialog */}
       <Dialog open={isMarkAttendanceDialogOpen} onOpenChange={setIsMarkAttendanceDialogOpen}>

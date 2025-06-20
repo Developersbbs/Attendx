@@ -24,6 +24,7 @@ import {
 } from "firebase/firestore";
 import { auth } from "@/app/firebase/config";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { query, where, getDocs } from "firebase/firestore";
 
 export default function page() {
   const [email, setEmail] = useState("");
@@ -77,7 +78,13 @@ export default function page() {
       
       // Optional: Verify user role or custom claims here if needed
       // For example, you might want to check if the user is actually a superadmin
-      
+      const q=query(collection(db,"superadmin"),where("email","==",user.email))
+      const snapshot=await getDocs(q)
+      const superadmin=snapshot.docs.map((doc)=>doc.data())
+      if(superadmin.length===0){
+        toast.error("You are not authorized to access this page")
+        return
+      }
       toast.success("Login successful! Redirecting...");
       router.push("/superadmin/dashboard");
     } catch (error) {
