@@ -53,6 +53,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { Switch } from "@/components/ui/switch";
+import LeaveTabForMeet from "./leavetabformeet";
 
 // Enhanced Logging System
 class Logger {
@@ -184,6 +185,7 @@ export default function LeaveTab({ user }) {
   const [partialLeave, setPartialLeave] = useState(false);
   const [officeStartTime, setOfficeStartTime] = useState(null);
   const [officeEndTime, setOfficeEndTime] = useState(null);
+  const [meetings, setMeetings] = useState([]);
 
   // Check for mobile view
   useEffect(() => {
@@ -245,7 +247,9 @@ export default function LeaveTab({ user }) {
 
           if (!adminSnapshot.empty) {
             const adminData = adminSnapshot.docs[0].data();
-            setAdminTrackingMethod(adminData.trackingMethod || "monthly");
+           console.log("adminData",adminData);
+
+            setAdminTrackingMethod(adminData.trackingMethod || "Daily Attendance");
             Logger.info("Admin tracking method fetched", {
               adminId: employeeData.adminuid,
               trackingMethod: adminData.trackingMethod,
@@ -401,6 +405,41 @@ export default function LeaveTab({ user }) {
       });
     }
   }, [startDate, endDate]);
+
+  useEffect(() => {
+    // Fetch meetings for Schedule Meetings method
+    const fetchMeetings = async (adminUid, employeeUid) => {
+      if (!adminUid || !employeeUid) return;
+      try {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const q = query(
+          collection(db, 'Meetings'),
+          where('adminUid', '==', adminUid),
+          where('meetingDate', '==', today)
+        );
+        const querySnapshot = await getDocs(q);
+        const meetingsList = querySnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            const isAttendee = (data.attendees || []).some(a => a.id === employeeUid);
+            if (isAttendee) {
+              return {
+                id: doc.id,
+                ...data,
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
+        setMeetings(meetingsList);
+      } catch (err) {
+        setMeetings([]);
+      }
+    };
+    if (adminTrackingMethod === 'Schedule Meetings' && employeeData?.adminuid && employeeData?.uid) {
+      fetchMeetings(employeeData.adminuid, employeeData.uid);
+    }
+  }, [adminTrackingMethod, employeeData]);
 
   const calculateLeavesTakenThisMonth = (requests) => {
     const currentDate = new Date();
@@ -635,9 +674,6 @@ export default function LeaveTab({ user }) {
     );
   };
 
-
-  
-
   const renderMobileCards = () => {
     Logger.debug("Rendering mobile cards view", {
       requestCount: leaveRequests.length,
@@ -743,6 +779,23 @@ export default function LeaveTab({ user }) {
 
   return (
     <div className="space-y-6">
+      {adminTrackingMethod === 'Schedule Meetings' && meetings.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Today's Meetings</h2>
+          <div className="space-y-2">
+            {meetings.map(meeting => (
+              <div key={meeting.id} className="border rounded p-3 flex flex-col md:flex-row md:items-center md:justify-between bg-slate-50">
+                <div>
+                  <div className="font-medium">{meeting.meetingTitle}</div>
+                  <div className="text-xs text-muted-foreground">Date: {format(new Date(meeting.meetingDate), 'MMM dd, yyyy')}</div>
+                  <div className="text-xs text-muted-foreground">Time: {meeting.meetingTime}</div>
+                  <div className="text-xs text-muted-foreground">Duration: {meeting.meetingDuration} hrs</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="text-right">
         <Button
           onClick={() => {
