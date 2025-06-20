@@ -531,8 +531,9 @@ const MapLocationTracker = ({ onLocationChange, currentLocation, isLoading }) =>
       )}
       
       {locationError && (
-        <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-          <p className="text-red-800">❌ {locationError}</p>
+        <div className="text-red-500 text-sm">
+          {locationError}
+          <button onClick={retryLocation} className="ml-2 underline text-blue-600">Retry</button>
         </div>
       )}
     </div>
