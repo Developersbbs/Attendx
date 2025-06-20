@@ -388,7 +388,7 @@ export default function LeaveTab({ user }) {
       isMounted = false;
       Logger.debug("Cleanup: fetchEmployeeData effect unmounted");
     };
-  }, [user]);
+  }, [user,leaveRequests]);
 
   useEffect(() => {
     if (startDate && endDate) {
@@ -569,7 +569,7 @@ export default function LeaveTab({ user }) {
     }
 
     // Calculate days requested
-    const daysRequested = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    const daysRequested = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) ;
 
     // Calculate monthly quota and available leaves
     const monthlyQuota = leaveQuota / 12;
@@ -820,7 +820,7 @@ export default function LeaveTab({ user }) {
             <DialogDescription>
               Fill in the details for your leave request.
             </DialogDescription>
-            {leavesTakenThisMonth >= monthlyQuota && (
+            {leavesTakenThisMonth > monthlyQuota && (
               <p className="text-sm text-red-500">
                 You have already taken {leavesTakenThisMonth} days of leave this
                 month.
@@ -980,7 +980,7 @@ export default function LeaveTab({ user }) {
             <DialogFooter className="sm:justify-start pt-2">
               <Button
                 type="submit"
-                disabled={isLoading || leavesTakenThisMonth >= monthlyQuota}
+                disabled={isLoading || leavesTakenThisMonth > monthlyQuota }
                 className={`w-full sm:w-auto${
                   notClicked ? ` cursor-not-allowed` : ``
                 }`}

@@ -553,6 +553,7 @@ export default function EmployeeManagementPage() {
                   name="phone"
                   type="tel"
                   value={newEmployee.phone}
+                  maxLength={10}
                   onChange={(e) =>
                     setNewEmployee((prev) => ({
                       ...prev,

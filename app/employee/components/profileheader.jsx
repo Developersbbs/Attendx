@@ -557,15 +557,22 @@ export function DailyAttendance({
   const isLateCheckIn = (time) => {
     if (!attendanceSettings.defaultStartTime) return false;
 
-    const defaultTime = attendanceSettings.defaultStartTime;
-    const convertDefaultTime = parse(defaultTime, "HH:mm", new Date());
-    const actualCheckIn = parse(time, "HH:mm", new Date());
+    
 
+    const defaultTime = attendanceSettings.defaultStartTime;
+    const convertDefaultTime = parse(defaultTime, "hh:mm a", new Date());
+    const actualCheckIn = parse(time, "hh:mm a", new Date());
+
+
+    console.log("actualCheckIn", actualCheckIn);
+    console.log("convertDefaultTime", convertDefaultTime);
     const diff = differenceInMinutes(actualCheckIn, convertDefaultTime);
 
     // a positive diff means check-in is after default time, hence late
     console.log("diff", diff);
-    return diff > (attendanceSettings.lateCheckInAllowed || 0);
+
+    console.log("diff early check in", attendanceSettings.earlyCheckInAllowed);
+    return diff > (attendanceSettings.earlyCheckInAllowed || 0);
   };
 
   // isEarlyCheckIn: True if check-in is before the official start time - grace period.
@@ -587,7 +594,7 @@ export function DailyAttendance({
   const isAbsent = (time) => {
     const checkInEndTime = parse(
       attendanceSettings.checkInEndTime,
-      "HH:mm",
+      "HH:mm a",
       new Date()
     );
     const currentTime = parse(time, "HH:mm", new Date());
@@ -645,7 +652,7 @@ export function DailyAttendance({
       const phoneNumber = user.phoneNumber.slice(3);
       const dateToday = format(new Date(), "yyyy-MM-dd");
 
-      const nowTime = format(new Date(), "HH:mm");
+      const nowTime = format(new Date(), "hh:mm a");
       const isLate = isLateCheckIn(nowTime);
 
       const isAbsent_ = isAbsent(nowTime);
@@ -732,7 +739,7 @@ export function DailyAttendance({
         throw new Error("User not authenticated or phone number not available");
       }
 
-      const nowTime = format(new Date(), "HH:mm");
+      const nowTime = format(new Date(), "hh:mm a");
       const phoneNumber = user.phoneNumber.slice(3);
       const dateToday = format(new Date(), "yyyy-MM-dd");
 

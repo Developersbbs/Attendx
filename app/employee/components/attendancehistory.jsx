@@ -161,12 +161,12 @@ const SelectedDateDetails = ({ selectedDate, attendanceData }) => {
               <p className="text-sm text-gray-500 mb-4">
                 {`No attendance was recorded for ${format(selectedDate, 'MMMM d, yyyy')}`}
               </p>
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              {/* <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <div className="flex items-center justify-center gap-2 text-gray-600">
                   <XCircle className="h-5 w-5" />
                   <span className="font-medium">Absent</span>
                 </div>
-              </div>
+              </div> */}
             </div>
           )
         ) : (
@@ -197,6 +197,7 @@ export default function AttendanceHistoryTab({ employeeId, user }) {
   const [location, setLocation] = useState("Office Location");
   const [attendanceStatusMsg, setAttendanceStatusMsg] = useState("");
   const router = useRouter();
+  const [isNoRecords , setIsNoRecords] = useState(false);
   const [admin_uid, setAdmin_uid] = useState("");
   const [profile, setProfile] = useState({
     tracingMethod: "",
@@ -295,7 +296,7 @@ export default function AttendanceHistoryTab({ employeeId, user }) {
       }
     };
     fetchAttendanceData();
-  }, [employeeId, router]);
+  }, [employeeId, router ,selectedDate  ]);
 
   useEffect(() => {
     const checkMobile = () => setIsMobileView(window.innerWidth < 768);
