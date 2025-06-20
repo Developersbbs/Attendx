@@ -14,6 +14,7 @@ import { auth } from '@/app/firebase/config';
 import { collection, query, where, getDocs, doc, orderBy , serverTimestamp , setDoc, Timestamp, limit  } from "firebase/firestore";
 import { db } from '@/app/firebase/config';
 import { parse , differenceInMinutes } from 'date-fns';
+import { Textarea } from "@/components/ui/textarea";
 
 // Address Geocoding Service
 const getAddressFromCoordinates = async (latitude, longitude) => {
@@ -173,6 +174,7 @@ const SignatureCanvas = ({ onSignatureChange, signature, disabled = false }) => 
     }
   }, [canvasRef]);
 
+  // Mouse events
   const startDrawing = (e) => {
     if (disabled) return;
     setIsDrawing(true);
@@ -193,6 +195,35 @@ const SignatureCanvas = ({ onSignatureChange, signature, disabled = false }) => 
   };
 
   const stopDrawing = () => {
+    if (!isDrawing || disabled) return;
+    setIsDrawing(false);
+    const dataURL = canvasRef.toDataURL();
+    onSignatureChange(dataURL);
+  };
+
+  // Touch events for mobile
+  const startTouch = (e) => {
+    if (disabled) return;
+    setIsDrawing(true);
+    const rect = canvasRef.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const moveTouch = (e) => {
+    if (!isDrawing || disabled) return;
+    const rect = canvasRef.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopTouch = (e) => {
     if (!isDrawing || disabled) return;
     setIsDrawing(false);
     const dataURL = canvasRef.toDataURL();
@@ -221,6 +252,9 @@ const SignatureCanvas = ({ onSignatureChange, signature, disabled = false }) => 
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
+          onTouchStart={startTouch}
+          onTouchMove={moveTouch}
+          onTouchEnd={stopTouch}
           style={{ touchAction: 'none' }}
         />
       </div>
@@ -552,6 +586,11 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
   // Mock upcoming meetings for today
   const [todaysMeetings, setTodaysMeetings] = useState([]);
 
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [leaveReason, setLeaveReason] = useState("");
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [leaveMeeting, setLeaveMeeting] = useState(null);
+
   useEffect(()=>{
     const fetchMeetings = async () => {
       try {
@@ -643,7 +682,7 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
           const data = doc.data();
           attendanceRecords.push({
             meetingId: data.meetingId || "", // Ensure meetingId is stored in attendance
-            checkInTime: data.meetingTime,
+            checkInTime: data.checkInTime,
             status: data.status
           });
         });
@@ -894,6 +933,9 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
 
   const activeMeetings = todaysMeetings.filter(m => !m.attended);
 
+
+  console.log("todaysMeetings",todaysMeetings); 
+
   if (activeMeetings.length === 0 && todaysMeetings.length > 0) {
     return <p className="text-sm text-green-600">All scheduled meetings for today attended!</p>;
   }
@@ -906,6 +948,36 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
   if(checkInTime){
        console.log("today meetings last one",checkInTime);
    }
+
+  // Leave submit handler
+  const handleLeaveSubmit = async (e) => {
+    e.preventDefault();
+    if (!leaveReason || !leaveMeeting) return;
+    setLeaveLoading(true);
+    try {
+      await setDoc(doc(collection(db, "leaves")), {
+        meetingId: leaveMeeting.id,
+        meetingTitle: leaveMeeting.meetingTitle,
+        meetingDate: leaveMeeting.meetingDate,
+        employeeId: user?.uid,
+        reason: leaveReason,
+        status: "Pending",
+        createdAt: serverTimestamp(),
+      });
+      sonnerToast.success("Leave request submitted", {
+        description: `Leave request for '${leaveMeeting.meetingTitle}' submitted successfully!`,
+      });
+      setIsLeaveDialogOpen(false);
+      setLeaveReason("");
+      setLeaveMeeting(null);
+    } catch (error) {
+      sonnerToast.error("Failed to submit leave request", {
+        description: error.message || "Please try again.",
+      });
+    } finally {
+      setLeaveLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4 self-center">
@@ -920,6 +992,7 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
           <p className="font-semibold">{meeting.meetingTitle}</p>
           <p className="text-xs text-muted-foreground">Date: {format(new Date(meeting.meetingDate), "MMM dd, yyyy")} - Time: {meeting.meetingTime}</p>
         </div>
+        <div className="flex flex-col gap-2 items-end">
         {attendance?.checkInTime ? (
           <Button size="sm" variant="outline" className="hover:pointer-events-none">
             <Check className="mr-2 h-4 w-4" /> 
@@ -931,11 +1004,52 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
             {`Mark Attendance`}
           </Button>
         )}
+        </div>
       </div>
     </Card>
   );
 })}
       </div>
+      
+      {/* Leave Dialog */}
+      <Dialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply for Leave</DialogTitle>
+            <DialogDescription>
+              {leaveMeeting && (
+                <>
+                  <div className="font-medium">Meeting: {leaveMeeting.meetingTitle}</div>
+                  <div className="text-xs text-muted-foreground mb-2">Date: {format(new Date(leaveMeeting.meetingDate), "MMM dd, yyyy")} - Time: {leaveMeeting.meetingTime}</div>
+                </>
+              )}
+              Please provide a reason for your leave request.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleLeaveSubmit} className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="leaveReason">Reason</Label>
+              <Textarea
+                id="leaveReason"
+                value={leaveReason}
+                onChange={e => setLeaveReason(e.target.value)}
+                placeholder="Briefly state the reason for your leave"
+                required
+              />
+            </div>
+            <DialogFooter className="sm:justify-start pt-2">
+              <Button type="submit" disabled={leaveLoading || !leaveReason} className="w-full sm:w-auto">
+                {leaveLoading ? <PageLoader className="mr-2 h-4 w-4 animate-spin" /> : "Submit Leave Request"}
+              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0">
+                  Cancel
+                </Button>
+              </DialogClose>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       
       {/* Mark Attendance Dialog */}
       <Dialog open={isMarkAttendanceDialogOpen} onOpenChange={setIsMarkAttendanceDialogOpen}>
