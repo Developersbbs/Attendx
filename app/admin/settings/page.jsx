@@ -655,7 +655,7 @@ export default function AdminSettingsPage() {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [meetingSettings]);
 
 
   console.log(showAddDailyAttendanceModal , "showAddDailyAttendanceModal")
@@ -874,7 +874,7 @@ export default function AdminSettingsPage() {
         adminUid: currentAdminUid,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
-        status: "upcoming",
+        
         meetingId: meetingRef.id,
       };
 
@@ -1008,8 +1008,11 @@ export default function AdminSettingsPage() {
         throw new Error("No authenticated user found.");
       }
 
+      console.log("before add credential")
       const credential = EmailAuthProvider.credential(email, newPassword);
+      console.log("after add credential")
       await linkWithCredential(currentUser, credential);
+      console.log("after link with credential")
 
       setNewPassword("");
       setConfirmPassword("");
@@ -1606,7 +1609,7 @@ export default function AdminSettingsPage() {
                   </div>
                   <div className="space-y-2 w-full relative">
                     <div className="flex items-center justify-between ">
-                      <LabelSettings>Select Members</LabelSettings>
+                      <LabelSettings>Select Departments or Members</LabelSettings>
                       {meetingSettings.attendees?.length > 0 && (
                         <Button
                           type="button"
@@ -1621,7 +1624,7 @@ export default function AdminSettingsPage() {
                     </div>
                     <div className="relative">
                       <InputSettings
-                        placeholder="Search employees..."
+                        placeholder="Search departments or employees..."
                         value={searchTerm}
                         onChange={(e) => {
                           setSearchTerm(e.target.value);
@@ -1642,28 +1645,46 @@ export default function AdminSettingsPage() {
                                 Select All Members
                               </div>
                               <div className="text-xs text-blue-500">
-                                Add all {employees.length} employees to this meeting
+                                Add all {employees.length} employees
                               </div>
                             </div>
                           </div>
                           
-                          {/* Individual Employee Options */}
-                          {filteredEmployees.length > 0 ? (
-                            filteredEmployees.map((employee) => {
-                              const isAlreadySelected = meetingSettings.attendees?.some(a => a.id === employee.id);
-                              return (
-                                <div
-                                  key={employee.id}
-                                  className={`px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${isAlreadySelected ? 'bg-green-50 text-green-700' : ''}`}
-                                  onClick={() => handleEmployeeSelect(employee, 'meeting')}
-                                >
-                                  {employee.name}
+                          {/* Departments with Members */}
+                          {Object.keys(departments)
+                            .filter(deptName => 
+                                deptName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                departments[deptName].some(emp => emp.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                            )
+                            .map(deptName => (
+                                <div key={deptName} className="border-b">
+                                    <div className="px-4 py-2 bg-gray-50 text-sm font-semibold text-gray-600 flex justify-between items-center">
+                                        <span>{deptName}</span>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-auto px-2 py-1 text-xs"
+                                            onClick={() => handleDepartmentSelect(deptName, 'meeting')}
+                                        >
+                                            Add all
+                                        </Button>
+                                    </div>
+                                    {departments[deptName]
+                                        .filter(employee => !searchTerm || employee.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                                        .map(employee => {
+                                        const isAlreadySelected = meetingSettings.attendees?.some(a => a.id === employee.id);
+                                        return (
+                                            <div
+                                            key={employee.id}
+                                            className={`pl-8 pr-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center ${isAlreadySelected ? 'bg-green-50 text-green-700' : ''}`}
+                                            onClick={() => handleEmployeeSelect(employee, 'meeting')}
+                                            >
+                                            {employee.name}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                              );
-                            })
-                          ) : (
-                            <div className="px-4 py-2 text-gray-500">No employees found</div>
-                          )}
+                            ))}
                         </div>
                       )}
                     </div>
