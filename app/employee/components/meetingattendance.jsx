@@ -726,26 +726,35 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
   },[isCheckedIn])
 
 
-  console.log("leaveRequests",leaveRequests)
+
 
   const isLateCheckIn = (time) => {
        const meeting = todaysMeetings.find(m => m.id === selectedMeeting.id);
-       const earlyCheckInAllowed = meeting.earlyCheckInAllowed;
-       const lateCheckInAllowed = meeting.lateCheckInAllowed;
+       if (!meeting) return false;
+       
        const meetingTime = meeting.meetingTime;
+       if (!meetingTime || !time) return false;
 
-       const convertMeetingTime = parse(meetingTime, "HH:mm", new Date());
-       const actualCheckIn = parse(time, "HH:mm", new Date());
-       const diff = differenceInMinutes(actualCheckIn, convertMeetingTime);
-       console.log("diff", diff)
-       return diff > (earlyCheckInAllowed || 0);
-
-
-      // const shiftStart = parse("09:00", "HH:mm", new Date());
-      // const actualCheckIn = parse(time, "hh:mm a", new Date());
-  
-      // const diff = differenceInMinutes(actualCheckIn, shiftStart);
-      // return diff > 30;
+       try {
+         // Create a reference date for today
+         const today = new Date();
+         const referenceDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+         
+         // Parse the meeting time and check-in time using the same reference date
+         const convertMeetingTime = parse(meetingTime, "hh:mm a", referenceDate);
+         const actualCheckIn = parse(time, "hh:mm a", referenceDate);
+         
+         console.log("Meeting time:", meetingTime, "Parsed meeting time:", convertMeetingTime);
+         console.log("Check-in time:", time, "Parsed check-in time:", actualCheckIn);
+         console.log("Is late:", actualCheckIn > convertMeetingTime);
+         
+         return actualCheckIn > convertMeetingTime;
+       } catch (error) {
+         console.error("Error parsing time:", error);
+         console.log("Meeting time format:", meetingTime);
+         console.log("Check-in time format:", time);
+         return false; // Default to not late if parsing fails
+       }
     };
 
 
@@ -777,7 +786,7 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
     try { 
       const phoneNumber = user.phoneNumber.slice(3);
       const dateToday = format(new Date(), "yyyy-MM-dd");
-      const nowTime = format(new Date(), "hh:mm");
+      const nowTime = format(new Date(), "hh:mm a");
 
       const isLate = isLateCheckIn(nowTime);
 
@@ -953,7 +962,6 @@ export default function Meetingattendance({ onMarkSuccess, currentLocation }) {
   const activeMeetings = todaysMeetings.filter(m => !m.attended);
 
 
-  console.log("todaysMeetings",todaysMeetings); 
 
   if (activeMeetings.length === 0 && todaysMeetings.length > 0) {
     return <p className="text-sm text-green-600">All scheduled meetings for today attended!</p>;

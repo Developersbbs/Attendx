@@ -12,7 +12,7 @@ import { Input as InputSettings } from "@/components/ui/input";
 import { Label as LabelSettings } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { toast } from "sonner";
 import {
   Save,
@@ -739,11 +739,18 @@ export default function AdminSettingsPage() {
   const handleDailySettingChange = (e) => {
     const { name, value, type, checked } = e.target;
     if (name.startsWith("workingDays.")) {
+
+
       const day = name.split(".")[1];
       setDailySettings((prev) => ({
         ...prev,
+       
         workingDays: { ...prev.workingDays, [day]: checked },
       }));
+
+      console.log(prev.defaultStartTime, "prev.defaultStartTime")
+      console.log(prev.defaultEndTime, "prev.defaultEndTime")
+      console.log(prev.workingDays, "prev.workingDays")
     } else {
       setDailySettings((prev) => ({
         ...prev,
@@ -798,13 +805,20 @@ export default function AdminSettingsPage() {
       const adminDoc = querySnap.docs[0];
       const currentAdminUid = adminDoc.id;
 
+      const defaultStartTime = format(parse(dailySettings.defaultStartTime, "HH:mm", new Date()), "hh:mm a")
+
+      const defaultEndTime = format(parse(dailySettings.defaultEndTime, "HH:mm", new Date()), "hh:mm a")
+
+
+      console.log(defaultStartTime, "defaultStartTime")
+      console.log(defaultEndTime, "defaultEndTime")
       const dailyAttendanceRef = doc(collection(db, "Daily_attendance"));
       
       const dailyAttendanceData = {
         adminUid: currentAdminUid,
         workingDays: dailySettings.workingDays,
-        defaultStartTime: dailySettings.defaultStartTime,
-        defaultEndTime: dailySettings.defaultEndTime,
+        defaultStartTime: defaultStartTime,
+        defaultEndTime: defaultEndTime,
         workingHours: dailySettings.workingHours,
         earlyCheckInAllowed: dailySettings.earlyCheckInAllowed,
         lateCheckOutAllowed: dailySettings.lateCheckOutAllowed,
@@ -860,6 +874,8 @@ export default function AdminSettingsPage() {
         throw new Error("User not found");
       }
 
+      const defaultStartTime = format(parse(meetingSettings.meetingTime, "HH:mm", new Date()), "hh:mm a")
+
       const adminDoc = querySnap.docs[0];
       const currentAdminUid = adminDoc.id;
       const meetingRef = doc(collection(db, "Meetings"));
@@ -867,7 +883,7 @@ export default function AdminSettingsPage() {
       const meetingData = {
         meetingTitle: meetingSettings.meetingTitle,
         meetingDate: meetingSettings.meetingDate,
-        meetingTime: meetingSettings.meetingTime,
+        meetingTime: defaultStartTime,
         meetingDuration: meetingSettings.meetingDuration,
         earlyCheckInAllowed: meetingSettings.earlyCheckInAllowed,
         attendees: meetingSettings.attendees || [],

@@ -562,17 +562,7 @@ export function DailyAttendance({
     const defaultTime = attendanceSettings.defaultStartTime;
     const convertDefaultTime = parse(defaultTime, "hh:mm a", new Date());
     const actualCheckIn = parse(time, "hh:mm a", new Date());
-
-
-    console.log("actualCheckIn", actualCheckIn);
-    console.log("convertDefaultTime", convertDefaultTime);
-    const diff = differenceInMinutes(actualCheckIn, convertDefaultTime);
-
-    // a positive diff means check-in is after default time, hence late
-    console.log("diff", diff);
-
-    console.log("diff early check in", attendanceSettings.earlyCheckInAllowed);
-    return diff > (attendanceSettings.earlyCheckInAllowed || 0);
+    return actualCheckIn > (convertDefaultTime || 0);
   };
 
   // isEarlyCheckIn: True if check-in is before the official start time - grace period.
@@ -594,10 +584,10 @@ export function DailyAttendance({
   const isAbsent = (time) => {
     const checkInEndTime = parse(
       attendanceSettings.checkInEndTime,
-      "HH:mm a",
+      "hh:mm a",
       new Date()
     );
-    const currentTime = parse(time, "HH:mm", new Date());
+    const currentTime = parse(time, "hh:mm a", new Date());
     return currentTime > checkInEndTime;
   };
 
@@ -654,6 +644,9 @@ export function DailyAttendance({
 
       const nowTime = format(new Date(), "hh:mm a");
       const isLate = isLateCheckIn(nowTime);
+
+
+      console.log("isLate asdnd", isLate);
 
       const isAbsent_ = isAbsent(nowTime);
 
