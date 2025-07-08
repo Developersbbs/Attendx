@@ -21,7 +21,7 @@ import { setDoc, doc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/app/firebase/config";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/app/firebase/config";
-import { query , getDocs , where } from "firebase/firestore";
+import { query , getDocs , where, updateDoc } from "firebase/firestore";
 
 
 
