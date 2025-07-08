@@ -26,7 +26,7 @@ export default function Home() {
             />
             <div className="flex flex-col">
               <h1 className="text-2xl font-bold text-blue-500" >Attendex</h1>
-              <p className="text-xs text-blue-500 font-medium">By SBBS</p>
+              <p className="text-xs text-blue-500 font-medium">Powered by SBBS</p>
             </div>
           </div>
           <Link href="/login"><Button>Get Started</Button></Link>
