@@ -29,7 +29,7 @@ export default function Home() {
               <p className="text-xs text-blue-500 font-medium">Powered by SBBS</p>
             </div>
           </div>
-          <Link href="/login"><Button>Get Started</Button></Link>
+          <Link href="/login"><Button>Login</Button></Link>
         </div>
       </header>
 
